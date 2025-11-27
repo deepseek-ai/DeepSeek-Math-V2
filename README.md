@@ -23,7 +23,7 @@
   <br>
   <a href="https://github.com/deepseek-ai/DeepSeek-V3/blob/main/LICENSE-CODE"><img alt="Code License"
     src="https://img.shields.io/badge/Code_License-MIT-f5de53?&color=f5de53"/></a>
-  <a href="https://github.com/deepseek-ai/DeepSeek-V3/blob/main/LICENSE-MODEL"><img alt="Model License"
+  <a href="https://github.com/deepseek-ai/DeepSeek-Math-V2/blob/main/LICENSE"><img alt="Model License"
     src="https://img.shields.io/badge/Model_License-Model_Agreement-f5de53?&color=f5de53"/></a>
   <br>
 </div>
@@ -71,7 +71,7 @@ DeepSeekMath-V2 is built on top of DeepSeek-V3.2-Exp-Base, which can be download
 For inference support, please refer to [the DeepSeek-V3.2-Exp github repository](https://github.com/deepseek-ai/DeepSeek-V3.2-Exp).
 
 ## 6. License
-The use of DeepSeekMath-V2 models is subject to [the Model License](LICENSE-MODEL).
+The use of DeepSeekMath-V2 models is subject to [the Model License](LICENSE).
 
 ## 7. Citation
 
