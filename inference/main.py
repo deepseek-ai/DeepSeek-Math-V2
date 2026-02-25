@@ -86,9 +86,9 @@ def prepare_proof_verification(path, tar_path):
                 proof = extract_solution(proof).strip()
                 try:
                     self_eval_score = float([s.strip() for s in extract_boxed_answers(self_eval) if s.strip()][-1])
-                except:
+                except Exception:
                     self_eval_score = 0
-            except:
+            except Exception:
                 continue
 
             item['self_eval'] = self_eval
@@ -128,7 +128,7 @@ def prepare_meta_verification(path, tar_path, drop_thought=True):
             scores = [s.strip() for s in extract_boxed_answers(rating) if s.strip()]
             try:
                 score = float(scores[-1])
-            except:
+            except Exception:
                 continue
             if score > 0.75:
                 continue
@@ -307,7 +307,7 @@ def prepare_proof_refinement(
                     scores = [s.strip() for s in extract_boxed_answers(quality) if s.strip()]
                     try:
                         score = float(scores[-1])
-                    except:
+                    except Exception:
                         continue
                     if rating not in rating2quality:
                         rating2quality[rating] = []
@@ -330,7 +330,7 @@ def prepare_proof_refinement(
                 scores = [s.strip() for s in extract_boxed_answers(rating) if s.strip()]
                 try:
                     score = float(scores[-1])
-                except:
+                except Exception:
                     continue
                 if problem not in problem2proof2ratings:
                     problem2proof2ratings[problem] = {}
