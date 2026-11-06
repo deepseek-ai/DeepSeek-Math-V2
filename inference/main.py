@@ -16,52 +16,64 @@ import multiprocessing
 
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--input_paths", required=True)
-parser.add_argument("--output_dirname", required=True, help="directory to dump results")
-parser.add_argument("--proof_pool_dirname", required=True, help="directory to maintain a pool of generated proofs for each evaluated problem")
+def get_parser():
+    parser = argparse.ArgumentParser(description="DeepSeekMath-V2 proof evaluation pipeline")
+    parser.add_argument("--input_paths", required=True, help="comma-separated paths to input json/jsonl datasets")
+    parser.add_argument("--output_dirname", required=True, help="directory to dump results")
+    parser.add_argument("--proof_pool_dirname", required=True, help="directory to maintain a pool of generated proofs for each evaluated problem")
 
-parser.add_argument("--batch_size", type=int, default=160)
+    parser.add_argument("--infer_script", type=str, default="generate", help="inference script name for proof generation (without .py)")
+    parser.add_argument("--proof_gen_url", type=str, default=None, help="endpoint URL for proof generation model")
+    parser.add_argument("--proof_rate_url", type=str, default=None, help="endpoint URL for proof rating and verification models")
 
-parser.add_argument("--proof_gen_num_processes", type=int, default=40)
-parser.add_argument("--proof_gen_temp", type=float, default=1.0)
-parser.add_argument("--proof_gen_max_len", type=int, default=128 * 1024)
-parser.add_argument("--proof_gen_template", type=str, default="proof_generation")
-parser.add_argument("--proof_refine_template", type=str, default="proof_refinement")
-parser.add_argument("--n_best_proofs_to_sample", type=int, default=32, help="the number of best proofs to consider for refinements")
-parser.add_argument("--n_proofs_to_refine", type=int, default=1, help="the number of proofs used as the input for a refinement")
-parser.add_argument("--n_agg_trials", type=int, default=32, help="the number of different combinations of proofs used for refinements")
-parser.add_argument("--n_parallel_proof_gen", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=160)
 
+    parser.add_argument("--proof_gen_num_processes", type=int, default=40)
+    parser.add_argument("--proof_gen_temp", type=float, default=1.0)
+    parser.add_argument("--proof_gen_max_len", type=int, default=128 * 1024)
+    parser.add_argument("--proof_gen_template", type=str, default="proof_generation")
+    parser.add_argument("--proof_refine_template", type=str, default="proof_refinement")
+    parser.add_argument("--n_best_proofs_to_sample", type=int, default=32, help="the number of best proofs to consider for refinements")
+    parser.add_argument("--n_proofs_to_refine", type=int, default=1, help="the number of proofs used as the input for a refinement")
+    parser.add_argument("--n_agg_trials", type=int, default=32, help="the number of different combinations of proofs used for refinements")
+    parser.add_argument("--n_parallel_proof_gen", type=int, default=128)
 
-parser.add_argument("--proof_verification_num_processes", type=int, default=320)
-parser.add_argument("--proof_verification_temp", type=float, default=1.0)
-parser.add_argument("--proof_verification_max_len", type=int, default=64 * 1024)
-parser.add_argument("--proof_verification_template", type=str, default="proof_verification")
-parser.add_argument("--n_verification_per_proof", type=int, default=4)
+    parser.add_argument("--proof_verification_num_processes", type=int, default=320)
+    parser.add_argument("--proof_verification_temp", type=float, default=1.0)
+    parser.add_argument("--proof_verification_max_len", type=int, default=64 * 1024)
+    parser.add_argument("--proof_verification_template", type=str, default="proof_verification")
+    parser.add_argument("--n_verification_per_proof", type=int, default=4)
 
+    parser.add_argument("--skip_meta_verification", action='store_true')
+    parser.add_argument("--meta_verification_num_processes", type=int, default=320)
+    parser.add_argument("--meta_verification_temp", type=float, default=1.0)
+    parser.add_argument("--meta_verification_max_len", type=int, default=64 * 1024)
+    parser.add_argument("--meta_verification_template", type=str, default="meta_verification")
+    parser.add_argument("--n_meta_verification_per_rating", type=int, default=1)
 
-parser.add_argument("--skip_meta_verification", action='store_true')
-parser.add_argument("--meta_verification_num_processes", type=int, default=320)
-parser.add_argument("--meta_verification_temp", type=float, default=1.0)
-parser.add_argument("--meta_verification_max_len", type=int, default=64 * 1024)
-parser.add_argument("--meta_verification_template", type=str, default="meta_verification")
-parser.add_argument("--n_meta_verification_per_rating", type=int, default=1)
+    parser.add_argument("--start_round", type=int, default=1)
+    parser.add_argument("--max_rounds", type=int, default=20)
+    return parser
 
+args = None
+input_paths = None
+output_dirname = None
+proof_pool_dirname = None
+proof_gen_url = None
+proof_rate_url = None
 
-parser.add_argument("--start_round", type=int, default=1)
-parser.add_argument("--max_rounds", type=int, default=20)
+if __name__ == '__main__':
+    parser = get_parser()
+    args, _ = parser.parse_known_args()
 
-args, _ = parser.parse_known_args()
+    input_paths = args.input_paths
+    output_dirname = args.output_dirname
+    proof_pool_dirname = args.proof_pool_dirname
 
-input_paths = args.input_paths
-output_dirname = args.output_dirname
-proof_pool_dirname = args.proof_pool_dirname
+    proof_gen_url = args.proof_gen_url
+    proof_rate_url = args.proof_rate_url
 
-proof_gen_url = args.proof_gen_url
-proof_rate_url = args.proof_rate_url
-
-args.proof_gen_with_self_eval = args.proof_gen_template in ['proof_generation']
+    args.proof_gen_with_self_eval = args.proof_gen_template in ['proof_generation']
 
 def prepare_proof_verification(path, tar_path):
     print(f"Proof Verification >>>\ninput path = {path}\noutput_path = {tar_path}", flush=True)
@@ -446,12 +458,12 @@ if __name__ == '__main__':
                     break
 
         n_sample = args.n_parallel_proof_gen if R == 1 else args.n_parallel_proof_gen // args.n_agg_trials
+        proof_gen_api_arg = f"--api_url {proof_gen_url} \\\n    " if proof_gen_url else ""
         proof_gen_cmd = f"""
     python {args.infer_script}.py \
     --input_data_path {proof_gen_input_path} \
     --output_data_path {proof_gen_output_path} \
-    --api_url {proof_gen_url} \
-    --batch_size {args.batch_size} \
+    {proof_gen_api_arg}--batch_size {args.batch_size} \
     --num_processes {args.proof_gen_num_processes} \
     --temperature {args.proof_gen_temp} \
     --top_p 0.95 \
@@ -477,11 +489,12 @@ if __name__ == '__main__':
                 tar_path=proof_verification_input_path
             )
 
+        proof_rate_api_arg = f"--api_url {proof_rate_url} \\\n        " if proof_rate_url else ""
         proof_verification_cmd = f"""
     python generate.py \
         --input_data_path {proof_verification_input_path} \
         --output_data_path {proof_verification_output_path} \
-        --batch_size {args.batch_size} \
+        {proof_rate_api_arg}--batch_size {args.batch_size} \
         --num_processes {args.proof_verification_num_processes} \
         --temperature {args.proof_verification_temp} \
         --top_p 0.95 \
@@ -512,7 +525,7 @@ if __name__ == '__main__':
     python generate.py \
         --input_data_path {meta_verification_input_path} \
         --output_data_path {meta_verification_output_path} \
-        --batch_size {args.batch_size} \
+        {proof_rate_api_arg}--batch_size {args.batch_size} \
         --num_processes {args.meta_verification_num_processes} \
         --temperature {args.meta_verification_temp} \
         --top_p 0.95 \
