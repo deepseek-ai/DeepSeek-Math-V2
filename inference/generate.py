@@ -13,11 +13,13 @@ from time import time, sleep
 from openai import AsyncOpenAI
 
 class APIModel:
-    def __init__(self):
+    def __init__(self, api_url=None):
+        base_url = api_url or os.environ.get("OPENAI_BASE_URL", "yyy")
+        api_key = os.environ.get("OPENAI_API_KEY", "xxx")
         self.client = AsyncOpenAI(
-            api_key="xxx",
+            api_key=api_key,
             timeout=300000,
-            base_url="yyy"
+            base_url=base_url
         )
 
     async def generate_one(self, prompt, sampling_params):
@@ -75,21 +77,26 @@ class APIModel:
             output_queue.put((batch_idx, output_data))
 
 
-def mp_generate_loop(input_queue, output_queue, sampling_params):
-    api_model = APIModel()
+def mp_generate_loop(input_queue, output_queue, sampling_params, api_url=None):
+    api_model = APIModel(api_url=api_url)
     sleep(5)
     api_model.mp_generate(input_queue, output_queue, sampling_params)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_data_path", required=True)
-    parser.add_argument("--output_data_path", required=True)
+def get_parser():
+    parser = argparse.ArgumentParser(description="DeepSeekMath-V2 batch inference generator")
+    parser.add_argument("--input_data_path", required=True, help="path to input jsonl")
+    parser.add_argument("--output_data_path", required=True, help="path to output jsonl")
+    parser.add_argument("--api_url", default=None, type=str, help="OpenAI-compatible API base URL")
     parser.add_argument("--num_processes", default=16, type=int)
     parser.add_argument("--batch_size", default=16, type=int)
     parser.add_argument("--temperature", required=True, type=float)
     parser.add_argument("--top_p", required=True, type=float)
     parser.add_argument("--max_tokens", required=True, type=int)
     parser.add_argument("--n", required=True, type=int)
+    return parser
+
+if __name__ == "__main__":
+    parser = get_parser()
     args, _ = parser.parse_known_args()
     input_data_path, output_data_path = args.input_data_path, args.output_data_path
     os.makedirs(os.path.dirname(output_data_path), exist_ok=True)
@@ -127,7 +134,7 @@ if __name__ == "__main__":
     processes = []
     
     for i in range(num_processes):
-        process = Process(target=mp_generate_loop, args=(input_queue, output_queue, sampling_params))
+        process = Process(target=mp_generate_loop, args=(input_queue, output_queue, sampling_params, getattr(args, 'api_url', None)))
         process.start()
         processes.append(process)
 
